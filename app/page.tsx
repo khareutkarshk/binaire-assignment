@@ -280,6 +280,34 @@ export default function Home() {
   }, [updateConnectionState]);
 
   useEffect(() => {
+    if (!hasHydrated || !signedIn) {
+      return;
+    }
+
+    if (titles.length === 0 && loadState !== "loading" && loadState !== "error" && !abortRef.current) {
+      void refreshTitles(true);
+    }
+  }, [hasHydrated, signedIn, titles.length, loadState, refreshTitles]);
+
+  const loadMoreTitles = useCallback(() => {
+    if (isRefreshing || abortRef.current) {
+      return;
+    }
+
+    if (titlesRef.current.length === 0) {
+      void refreshTitles(true);
+      return;
+    }
+
+    if (!nextPageTokenRef.current) {
+      return;
+    }
+
+    setVisibleCount((count) => Math.min(count + 24, titlesRef.current.length + 24));
+    void refreshTitles();
+  }, [isRefreshing, refreshTitles]);
+
+  useEffect(() => {
     titlesRef.current = titles;
   }, [titles]);
 
@@ -322,13 +350,13 @@ export default function Home() {
 
     const observer = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
-        setVisibleCount((count) => Math.min(count + 24, titles.length));
+        loadMoreTitles();
       }
     });
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [titles.length, visibleCount, nextPageToken, isRefreshing, refreshTitles, signedIn]);
+  }, [loadMoreTitles, signedIn]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -427,6 +455,10 @@ export default function Home() {
   const visibleTitles = titles.slice(0, visibleCount);
   const continueWatching = history.map((id) => titleById.get(id)).filter(Boolean) as MovieTitle[];
   const savedTitles = watchlist.map((id) => titleById.get(id)).filter(Boolean) as MovieTitle[];
+  const isRetryState = loadState === "error" && titles.length === 0;
+  const shouldShowLoadButton = Boolean(nextPageToken || isRetryState);
+  const buttonLabel = isRetryState ? "Try again" : titles.length ? (nextPageToken ? "Load more" : "Library ready") : "Load library";
+  const buttonDisabled = isRefreshing || (!isOnline && !isRetryState) || (!shouldShowLoadButton && titles.length > 0);
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -554,8 +586,8 @@ export default function Home() {
                 <h3>Complete library</h3>
                 <p>{titles.length.toLocaleString()} titles cached toward 10,000</p>
               </div>
-              <button onClick={() => refreshTitles()} disabled={isRefreshing || !isOnline}>
-                {titles.length ? "Load more" : "Load library"}
+              <button onClick={() => loadMoreTitles()} disabled={buttonDisabled}>
+                {buttonLabel}
               </button>
             </section>
             {apiNotice && <div className="api-notice">{apiNotice}</div>}
