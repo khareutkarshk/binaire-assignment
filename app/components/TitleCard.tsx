@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { displayType } from "../lib/media";
 import type { MovieTitle } from "../types";
 
@@ -10,19 +10,29 @@ type TitleCardProps = {
   onToggle: (id: string) => void;
 };
 
-export function TitleCard({ title, saved, compact = false, onOpen, onToggle }: TitleCardProps) {
+export const TitleCard = memo(function TitleCard({
+  title,
+  saved,
+  compact = false,
+  onOpen,
+  onToggle,
+}: TitleCardProps) {
   const posterUrl = title.primaryImage?.url;
   const hasValidPoster = Boolean(posterUrl && /^https?:\/\//i.test(posterUrl));
   const [imageFailed, setImageFailed] = useState(false);
-  const fallbackLabel = title.primaryTitle.slice(0, 2).toUpperCase() || "TV";
 
   return (
     <article className={`title-card ${compact ? "compact" : ""}`}>
       <button className="poster-button" onClick={() => onOpen(title)}>
         {hasValidPoster && !imageFailed ? (
-          <img src={posterUrl} alt={title.primaryTitle} loading="lazy" onError={() => setImageFailed(true)} />
+          <img
+            src={posterUrl}
+            alt={title.primaryTitle}
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
         ) : (
-          <div className="poster-fallback">{fallbackLabel}</div>
+          <div className="poster-fallback">{title.primaryTitle.slice(0, 2).toUpperCase() || "TV"}</div>
         )}
       </button>
       <div className="card-copy">
@@ -36,4 +46,4 @@ export function TitleCard({ title, saved, compact = false, onOpen, onToggle }: T
       </button>
     </article>
   );
-}
+});

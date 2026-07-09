@@ -28,6 +28,10 @@ const hasConfig = Boolean(
     firebaseConfig.appId,
 );
 
+export function isFirebaseConfigured() {
+  return hasConfig;
+}
+
 function getFirebaseApp(): FirebaseApp | null {
   if (!hasConfig) {
     return null;

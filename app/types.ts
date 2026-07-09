@@ -22,9 +22,4 @@ export type MovieTitle = {
   plot?: string;
 };
 
-export type LocalUser = {
-  email: string;
-  name: string;
-};
-
 export type View = "home" | "search" | "profile";

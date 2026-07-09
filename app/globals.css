@@ -605,6 +605,41 @@ button:disabled {
   }
 }
 
+.view-panel {
+  animation: view-fade-slide 280ms ease both;
+}
+
+@keyframes view-fade-slide {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.config-hint {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.config-hint ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.config-hint code {
+  color: var(--foreground);
+}
+
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;

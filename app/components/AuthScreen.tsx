@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { FormEvent } from "react";
 
 type AuthScreenProps = {
@@ -7,14 +8,20 @@ type AuthScreenProps = {
   onModeToggle: () => void;
 };
 
-export function AuthScreen({ authMode, authError, onSubmit, onModeToggle }: AuthScreenProps) {
+export const AuthScreen = memo(function AuthScreen({
+  authMode,
+  authError,
+  onSubmit,
+  onModeToggle,
+}: AuthScreenProps) {
   return (
     <main className="auth-shell">
       <section className="auth-panel">
         <div className="brand">Streamline</div>
         <h1>Unlimited short-form shows, movies, and collections.</h1>
         <p>
-          Sign in to browse the storefront, keep your watchlist, and continue from cached titles when the network drops.
+          Sign in to browse the storefront, keep your watchlist, and continue from cached titles when
+          the network drops.
         </p>
         <form onSubmit={onSubmit} className="auth-form">
           {authMode === "signup" && (
@@ -45,4 +52,4 @@ export function AuthScreen({ authMode, authError, onSubmit, onModeToggle }: Auth
       </section>
     </main>
   );
-}
+});
