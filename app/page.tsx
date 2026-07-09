@@ -65,7 +65,6 @@ function readList(key: string) {
     return [];
   }
 }
-
 function readSavedUser() {
   if (typeof window === "undefined") {
     return null;
@@ -105,6 +104,7 @@ function readOnlineStatus() {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
+
 async function fetchTitles(pageToken?: string, signal?: AbortSignal) {
   const params = new URLSearchParams();
   params.append("types", "MOVIE");
@@ -121,14 +121,18 @@ async function fetchTitles(pageToken?: string, signal?: AbortSignal) {
     signal,
   });
 
-  if (!response.ok) {
-    throw new Error(`Unable to load titles:${response.status}`);
-  }
-
   const payload = (await response.json()) as TitlesResponse;
 
-  if (payload.code === 13 || payload.message?.toLowerCase().includes("too many network requests")) {
+  if (
+    payload.code === 13 ||
+    payload.message?.toLowerCase().includes("too many network requests") ||
+    payload.message?.toLowerCase().includes("429")
+  ) {
     throw new Error("Unable to load titles:429");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Unable to load titles:${response.status}`);
   }
 
   return payload;
@@ -137,8 +141,8 @@ async function fetchTitles(pageToken?: string, signal?: AbortSignal) {
 async function searchRemote(query: string, signal?: AbortSignal) {
   const params = new URLSearchParams({ query, limit: String(PAGE_LIMIT) });
   const response = await fetch(`${API_BASE}/search/titles?${params}`, {
-    cache: "no-store",
-    signal,
+    cache: "no-store", 
+    signal, 
   });
 
   if (!response.ok) {
@@ -177,6 +181,7 @@ export default function Home() {
   const titlesRef = useRef<MovieTitle[]>(titles);
   const nextPageTokenRef = useRef<string | undefined>(nextPageToken);
   const cooldownUntilRef = useRef(0);
+  const hasAttemptedInitialLoadRef = useRef(false);
 
   const signedIn = Boolean(firebaseUser || localUser);
   const userEmail = firebaseUser?.email || localUser?.email || "";
@@ -256,13 +261,13 @@ export default function Home() {
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
         const message = (error as Error).message;
+        const isRateLimit = message.endsWith(":429");
         const isNetworkFailure =
           !navigator.onLine ||
           message.includes("Failed to fetch") ||
-          message.includes("NetworkError") ||
-          message.includes("load titles");
+          message.includes("NetworkError");
 
-        if (message.endsWith(":429")) {
+        if (isRateLimit) {
           cooldownUntilRef.current = Date.now() + REQUEST_COOLDOWN_MS;
           setApiNotice("IMDb is rate limiting requests. Showing cached titles for now.");
         } else if (isNetworkFailure) {
@@ -280,14 +285,18 @@ export default function Home() {
   }, [updateConnectionState]);
 
   useEffect(() => {
-    if (!hasHydrated || !signedIn) {
+    if (!signedIn) {
+      hasAttemptedInitialLoadRef.current = false;
       return;
     }
 
-    if (titles.length === 0 && loadState !== "loading" && loadState !== "error" && !abortRef.current) {
-      void refreshTitles(true);
+    if (!hasHydrated || titles.length > 0 || hasAttemptedInitialLoadRef.current || abortRef.current) {
+      return;
     }
-  }, [hasHydrated, signedIn, titles.length, loadState, refreshTitles]);
+
+    hasAttemptedInitialLoadRef.current = true;
+    void refreshTitles(true);
+  }, [hasHydrated, signedIn, titles.length, refreshTitles]);
 
   const loadMoreTitles = useCallback(() => {
     if (isRefreshing || abortRef.current) {
@@ -348,6 +357,10 @@ export default function Home() {
       return;
     }
 
+    if (titles.length === 0 || !nextPageToken || loadState !== "ready") {
+      return;
+    }
+
     const observer = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
         loadMoreTitles();
@@ -356,7 +369,7 @@ export default function Home() {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [loadMoreTitles, signedIn]);
+  }, [loadMoreTitles, signedIn, titles.length, nextPageToken, loadState]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -456,9 +469,7 @@ export default function Home() {
   const continueWatching = history.map((id) => titleById.get(id)).filter(Boolean) as MovieTitle[];
   const savedTitles = watchlist.map((id) => titleById.get(id)).filter(Boolean) as MovieTitle[];
   const isRetryState = loadState === "error" && titles.length === 0;
-  const shouldShowLoadButton = Boolean(nextPageToken || isRetryState);
-  const buttonLabel = isRetryState ? "Try again" : titles.length ? (nextPageToken ? "Load more" : "Library ready") : "Load library";
-  const buttonDisabled = isRefreshing || (!isOnline && !isRetryState) || (!shouldShowLoadButton && titles.length > 0);
+  const shouldShowRetryButton = isRetryState;
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -586,9 +597,11 @@ export default function Home() {
                 <h3>Complete library</h3>
                 <p>{titles.length.toLocaleString()} titles cached toward 10,000</p>
               </div>
-              <button onClick={() => loadMoreTitles()} disabled={buttonDisabled}>
-                {buttonLabel}
-              </button>
+              {shouldShowRetryButton && (
+                <button onClick={() => refreshTitles(true)} disabled={isRefreshing || !isOnline}>
+                  Try again
+                </button>
+              )}
             </section>
             {apiNotice && <div className="api-notice">{apiNotice}</div>}
 
